@@ -17,7 +17,7 @@ typedef struct i8080 {
   unsigned long cyc; // cycle count
 
   uint16_t pc, sp; // program counter, stack pointer
-  uint8_t a, b, c, d, e, h, l; // registers
+  uint8_t a, b, c, d, e, h, l, h1, l1; // registers
   // flags: sign, zero, half-carry, parity, carry, interrupt flip-flop
   bool sf : 1, zf : 1, hf : 1, pf : 1, cf : 1, iff : 1;
   bool halted : 1;

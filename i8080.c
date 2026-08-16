@@ -1,5 +1,7 @@
 #include "i8080.h"
 
+static bool kr580vm1_emu = false;
+
 // this array defines the number of cycles one opcode takes.
 // note that there are some special cases: conditional RETs and CALLs
 // add +6 cycles if the condition is met
@@ -374,6 +376,12 @@ static inline void i8080_xthl(i8080* const c) {
   i8080_set_hl(c, val);
 }
 
+static inline void kr850vm1_handle_28(i8080* const c, uint8_t opcode) {
+}
+
+static inline void kr850vm1_handle_38(i8080* const c, uint8_t opcode) {
+}
+
 // executes one opcode
 static inline void i8080_execute(i8080* const c, uint8_t opcode) {
   c->cyc += OPCODES_CYCLES[opcode];
@@ -686,9 +694,20 @@ static inline void i8080_execute(i8080* const c, uint8_t opcode) {
   case 0x10:
   case 0x18:
   case 0x20:
+  case 0x30: break; // undocumented NOPs
+
+  // On the 8080 these act as NOPs.
+  // The KR580VM1 uses these as prefixes for new instructions.
   case 0x28:
-  case 0x30:
-  case 0x38: break; // undocumented NOPs
+    if (kr850vm1_emu)
+        kr850vm1_handle_28(c, i8080_next_byte(c));
+    else
+        break;
+  case 0x38:
+    if (kr850vm1_emu)
+        kr850vm1_handle_38(c, i8080_next_byte(c));
+    else
+        break;
 
   case 0xD9: i8080_ret(c); break; // undocumented RET
 
