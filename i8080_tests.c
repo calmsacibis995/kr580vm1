@@ -73,7 +73,7 @@ static inline int load_file(const char* filename, uint16_t addr) {
 
 static inline void run_test(
     i8080* const c, const char* filename, unsigned long cyc_expected) {
-  i8080_init(c);
+  i8080_init(c, false);
   c->userdata = c;
   c->read_byte = rb;
   c->write_byte = wb;

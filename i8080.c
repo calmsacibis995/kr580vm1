@@ -443,11 +443,11 @@ static inline void kr580vm1_dcmp_h1l1(i8080* const c, uint16_t val) {
 }
 
 // executes one opcode from the MB prefix
-static inline void kr850vm1_handle_28(i8080* const c, uint8_t opcode) {
+static inline void kr580vm1_handle_28(i8080* const c, uint8_t opcode) {
 }
 
 // executes one opcode from the RS prefix
-static inline void kr850vm1_handle_38(i8080* const c, uint8_t opcode) {
+static inline void kr580vm1_handle_38(i8080* const c, uint8_t opcode) {
   switch (opcode) {
   case 0x09: i8080_dad(c, i8080_get_bc(c)); break; // RS DAD B
   case 0x19: i8080_dad(c, i8080_get_de(c)); break; // RS DAD D
