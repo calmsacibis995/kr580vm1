@@ -1,5 +1,7 @@
 #include "i8080.h"
 
+// this variable allows for the emulation of the KR580VM1,
+// a Soviet clone of the i8080 with additional features.
 static bool kr580vm1_emu = false;
 
 // this array defines the number of cycles one opcode takes.
@@ -7,6 +9,50 @@ static bool kr580vm1_emu = false;
 // add +6 cycles if the condition is met
 // clang-format off
 static const uint8_t OPCODES_CYCLES[256] = {
+//  0  1   2   3   4   5   6   7   8  9   A   B   C   D   E  F
+    4, 10, 7,  5,  5,  5,  7,  4,  4, 10, 7,  5,  5,  5,  7, 4,  // 0
+    4, 10, 7,  5,  5,  5,  7,  4,  4, 10, 7,  5,  5,  5,  7, 4,  // 1
+    4, 10, 16, 5,  5,  5,  7,  4,  4, 10, 16, 5,  5,  5,  7, 4,  // 2
+    4, 10, 13, 5,  10, 10, 10, 4,  4, 10, 13, 5,  5,  5,  7, 4,  // 3
+    5, 5,  5,  5,  5,  5,  7,  5,  5, 5,  5,  5,  5,  5,  7, 5,  // 4
+    5, 5,  5,  5,  5,  5,  7,  5,  5, 5,  5,  5,  5,  5,  7, 5,  // 5
+    5, 5,  5,  5,  5,  5,  7,  5,  5, 5,  5,  5,  5,  5,  7, 5,  // 6
+    7, 7,  7,  7,  7,  7,  7,  7,  5, 5,  5,  5,  5,  5,  7, 5,  // 7
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // 8
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // 9
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // A
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // B
+    5, 10, 10, 10, 11, 11, 7,  11, 5, 10, 10, 10, 11, 17, 7, 11, // C
+    5, 10, 10, 10, 11, 11, 7,  11, 5, 10, 10, 10, 11, 17, 7, 11, // D
+    5, 10, 10, 18, 11, 11, 7,  11, 5, 5,  10, 4,  11, 17, 7, 11, // E
+    5, 10, 10, 4,  11, 11, 7,  11, 5, 5,  10, 4,  11, 17, 7, 11  // F
+};
+
+// this array defines the number of cycles one opcode takes for
+// each instruction which is part of the 0x28 prefix (KR580VM1 only).
+static const uint8_t OPCODES_CYCLES_28[256] = {
+//  0  1   2   3   4   5   6   7   8  9   A   B   C   D   E  F
+    4, 10, 7,  5,  5,  5,  7,  4,  4, 10, 7,  5,  5,  5,  7, 4,  // 0
+    4, 10, 7,  5,  5,  5,  7,  4,  4, 10, 7,  5,  5,  5,  7, 4,  // 1
+    4, 10, 16, 5,  5,  5,  7,  4,  4, 10, 16, 5,  5,  5,  7, 4,  // 2
+    4, 10, 13, 5,  10, 10, 10, 4,  4, 10, 13, 5,  5,  5,  7, 4,  // 3
+    5, 5,  5,  5,  5,  5,  7,  5,  5, 5,  5,  5,  5,  5,  7, 5,  // 4
+    5, 5,  5,  5,  5,  5,  7,  5,  5, 5,  5,  5,  5,  5,  7, 5,  // 5
+    5, 5,  5,  5,  5,  5,  7,  5,  5, 5,  5,  5,  5,  5,  7, 5,  // 6
+    7, 7,  7,  7,  7,  7,  7,  7,  5, 5,  5,  5,  5,  5,  7, 5,  // 7
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // 8
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // 9
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // A
+    4, 4,  4,  4,  4,  4,  7,  4,  4, 4,  4,  4,  4,  4,  7, 4,  // B
+    5, 10, 10, 10, 11, 11, 7,  11, 5, 10, 10, 10, 11, 17, 7, 11, // C
+    5, 10, 10, 10, 11, 11, 7,  11, 5, 10, 10, 10, 11, 17, 7, 11, // D
+    5, 10, 10, 18, 11, 11, 7,  11, 5, 5,  10, 4,  11, 17, 7, 11, // E
+    5, 10, 10, 4,  11, 11, 7,  11, 5, 5,  10, 4,  11, 17, 7, 11  // F
+};
+
+// this array defines the number of cycles one opcode takes for
+// each instruction which is part of the 0x38 prefix (KR580VM1 only).
+static const uint8_t OPCODES_CYCLES_38[256] = {
 //  0  1   2   3   4   5   6   7   8  9   A   B   C   D   E  F
     4, 10, 7,  5,  5,  5,  7,  4,  4, 10, 7,  5,  5,  5,  7, 4,  // 0
     4, 10, 7,  5,  5,  5,  7,  4,  4, 10, 7,  5,  5,  5,  7, 4,  // 1
@@ -132,6 +178,10 @@ static inline uint16_t i8080_get_de(i8080* const c) {
 
 static inline uint16_t i8080_get_hl(i8080* const c) {
   return (c->h << 8) | c->l;
+}
+
+static inline uint16_t kr580vm1_get_h1l1(i8080* const c) {
+  return (c->h1 << 8) | c->l1;
 }
 
 // stack helpers
@@ -376,15 +426,51 @@ static inline void i8080_xthl(i8080* const c) {
   i8080_set_hl(c, val);
 }
 
+static inline void kr580vm1_dcmp(i8080* const c, uint16_t val) {
+  int16_t result;
+  result = ((c->h << 8) | c->l) - val;
+  c->cf = ((c->h << 8) | c->l) < val;
+  c->hf = ~(c->a ^ result ^ val) & 0x10;
+  SET_ZSP(c, result & 0xFF);
+}
+
+static inline void kr580vm1_dcmp_h1l1(i8080* const c, uint16_t val) {
+  int16_t result;
+  result = ((c->h1 << 8) | c->l1) - val;
+  c->cf = ((c->h1 << 8) | c->l1) < val;
+  c->hf = ~(c->a ^ result ^ val) & 0x10;
+  SET_ZSP(c, result & 0xFF);
+}
+
+// executes one opcode from the MB prefix
 static inline void kr850vm1_handle_28(i8080* const c, uint8_t opcode) {
 }
 
+// executes one opcode from the RS prefix
 static inline void kr850vm1_handle_38(i8080* const c, uint8_t opcode) {
+  switch (opcode) {
+  case 0x09: i8080_dad(c, i8080_get_bc(c)); break; // RS DAD B
+  case 0x19: i8080_dad(c, i8080_get_de(c)); break; // RS DAD D
+  case 0x29: i8080_dad(c, kr580vm1_get_h1l1(c)); break; // RS DAD H1
+  case 0x39: i8080_dad(c, c->sp); break; // RS DAD SP
+  case 0xCB: kr580vm1_dcmp_h1l1(c, i8080_get_bc(c)); break; // RS DCMP B
+  case 0xDD: kr580vm1_dcmp_h1l1(c, i8080_get_de(c)); break; // RS DCMP D
+  }
 }
 
 // executes one opcode
 static inline void i8080_execute(i8080* const c, uint8_t opcode) {
-  c->cyc += OPCODES_CYCLES[opcode];
+  if (kr580vm1_emu) {
+    if (opcode == 0x38) {
+      c->cyc += OPCODES_CYCLES_38[c->pc + 1];
+    } else if (opcode == 0x28) {
+      c->cyc += OPCODES_CYCLES_28[c->pc + 1];
+    } else {
+      c->cyc += OPCODES_CYCLES[opcode];
+    }
+  } else {
+    c->cyc += OPCODES_CYCLES[opcode];
+  }
 
   // when DI is executed, interrupts won't be serviced
   // until the end of next instruction:
@@ -699,28 +785,38 @@ static inline void i8080_execute(i8080* const c, uint8_t opcode) {
   // On the 8080 these act as NOPs.
   // The KR580VM1 uses these as prefixes for new instructions.
   case 0x28:
-    if (kr850vm1_emu)
-        kr850vm1_handle_28(c, i8080_next_byte(c));
-    else
-        break;
+    if (kr580vm1_emu)
+        kr580vm1_handle_28(c, i8080_next_byte(c)); // MB prefix
+    break;
   case 0x38:
-    if (kr850vm1_emu)
-        kr850vm1_handle_38(c, i8080_next_byte(c));
-    else
-        break;
+    if (kr580vm1_emu)
+        kr580vm1_handle_38(c, i8080_next_byte(c)); // RS prefix
+    break;
 
   case 0xD9: i8080_ret(c); break; // undocumented RET
 
   case 0xDD:
+    if (kr580vm1_emu)
+      kr580vm1_dcmp(c, i8080_get_de(c)); // DCMP B on KR580VM1
+    else
+      i8080_call(c, i8080_next_word(c)); // undocumented CALL on i8080
+    break;
+
   case 0xED:
   case 0xFD: i8080_call(c, i8080_next_word(c)); break; // undocumented CALLs
 
-  case 0xCB: i8080_jmp(c, i8080_next_word(c)); break; // undocumented JMP
+  case 0xCB:
+    if (kr580vm1_emu)
+      kr580vm1_dcmp(c, i8080_get_bc(c)); // DCMP B on KR580VM1
+    else
+      i8080_jmp(c, i8080_next_word(c)); // undocumented JMP on i8080
+    break;
   }
 }
 
 // initialises the emulator with default values
-void i8080_init(i8080* const c) {
+void i8080_init(i8080* const c, bool kr580vm1_flag) {
+  kr580vm1_emu = kr580vm1_flag;
   c->read_byte = NULL;
   c->write_byte = NULL;
   c->port_in = NULL;
@@ -739,6 +835,10 @@ void i8080_init(i8080* const c) {
   c->e = 0;
   c->h = 0;
   c->l = 0;
+  if (kr580vm1_flag) {
+      c->h1 = 0;
+      c->l1 = 0;
+  }
 
   c->sf = 0;
   c->zf = 0;
